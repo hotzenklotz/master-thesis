@@ -67,3 +67,4 @@ target/
 .idea/**
 */log/**
 /datasets/**
+/learning/MNIST-data
