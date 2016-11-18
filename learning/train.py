@@ -62,22 +62,13 @@ def train():
                 # Shuffle the examples and collect them into batch_size batches.
                 # (Internally uses a RandomShuffleQueue.)
                 # We run this in two threads to avoid being a bottleneck.
-                images = tf.train.batch(
-                    [images], batch_size=config["batch_size"], num_threads=2,
+                images, labels = tf.train.batch(
+                    [images, labels], batch_size=config["batch_size"], num_threads=2,
                     capacity=1000 + 3 * config["batch_size"],
                     # Ensures a minimum amount of shuffling of examples.
 
                     enqueue_many=True
                 )
-
-                labels = tf.train.batch(
-                    [labels], batch_size=config["batch_size"], num_threads=2,
-                    capacity=1000 + 3 * config["batch_size"],
-                    # Ensures a minimum amount of shuffling of examples.
-
-                    enqueue_many=True
-                )
-
 
                 # Init Model
                 model = cnn_model
@@ -96,11 +87,28 @@ def train():
 
                     slim.summarize_tensors(summaries.values())
 
-                # with tf.variable_scope(vs, reuse=True):
-                #     validation_logits, _ = model.create_model(validation_images, config, is_training=False)
-                #     validation_loss_op = model.loss(validation_logits, validation_labels)
-                #     validation_prediction_op = tf.cast(tf.argmax(tf.nn.softmax(validation_logits), 1), tf.int32)
-                #     tf.scalar_summary("validation_loss", validation_loss_op)
+                with tf.variable_scope(vs, reuse=True):
+
+                    val_images = tf.reshape(mnist.test.images, [-1, 28, 28])
+                    val_images = tf.expand_dims(val_images, -1)
+
+
+                    #pairs = [[image, label[i]] for (i, image) in enumerate(images)]
+                    # Shuffle the examples and collect them into batch_size batches.
+                    # (Internally uses a RandomShuffleQueue.)
+                    # We run this in two threads to avoid being a bottleneck.
+                    validation_images, validation_labels = tf.train.batch(
+                        [val_images, mnist.test.labels], batch_size=config["batch_size"], num_threads=2,
+                        capacity=1000 + 3 * config["batch_size"],
+                        # Ensures a minimum amount of shuffling of examples.
+                        enqueue_many=True
+                    )
+
+
+                    validation_logits, _ = model.create_model(validation_images, config, is_training=False)
+                    validation_loss_op = model.loss(validation_logits, validation_labels)
+                    validation_prediction_op = tf.cast(tf.argmax(tf.nn.softmax(validation_logits), 1), tf.int32)
+                    tf.scalar_summary("validation_loss", validation_loss_op)
 
                 # Adam optimizer already does LR decay
                 train_op = tf.train.AdamOptimizer(learning_rate=config["learning_rate"], beta1=0.9, beta2=0.999, epsilon=1e-08, use_locking=False,
@@ -144,16 +152,16 @@ def train():
                         print(format_str % (datetime.now(), step, loss_value, examples_per_sec, duration))
 
                     # Evaluate a training batch periodically
-                    if step % 100 == 0 and step > 0:
-                        predicted_labels, true_labels = sess.run([prediction_op, labels])
-                        evaluation_metrics(true_labels, predicted_labels, summary_writer, step, prefix="training")
+                    # if step % 100 == 0 and step > 0:
+                    #     predicted_labels, true_labels = sess.run([prediction_op, labels])
+                    #     evaluation_metrics(true_labels, predicted_labels, summary_writer, step, prefix="training")
 
                     # Run a validation set of 100*batch_size samples periodically
-                    # if step % 500 == 0 and step > 0:
-                    #     eval_results = map(lambda x: sess.run([validation_loss_op, validation_prediction_op, validation_labels]), range(0, 100))
-                    #     validation_loss, predicted_labels, true_labels = map(list, zip(*eval_results))
-                    #     evaluation_metrics(np.concatenate(true_labels), np.concatenate(predicted_labels), summary_writer, step, prefix="validation")
-                    #     print("Validation loss: ", np.mean(validation_loss))
+                    if step % 100 == 0 and step > 0:
+                        eval_results = map(lambda x: sess.run([validation_loss_op, validation_prediction_op, validation_labels]), range(0, 100))
+                        validation_loss, predicted_labels, true_labels = map(list, zip(*eval_results))
+                        evaluation_metrics(np.concatenate(true_labels), np.concatenate(predicted_labels), summary_writer, step, prefix="validation")
+                        print("Validation loss: ", np.mean(validation_loss))
 
                     # Save the summary periodically
                     if step % 100 == 0 and step > 0:
