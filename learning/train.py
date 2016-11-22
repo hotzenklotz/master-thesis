@@ -14,6 +14,7 @@ from models import crnn_model
 from models import cnn_model
 from models import lstm_model
 from models import topcoder_crnn
+from models import lenet
 
 import loaders
 from evaluate import evaluation_metrics
@@ -71,96 +72,21 @@ def train():
                 )
 
                 # Init Model
-                model = cnn_model
+                model = lenet
 
-                def create_model(data, train=False, scope="testmodel"):
-
-                    with tf.variable_scope(scope) as sc:
-                        conv1_weights = tf.get_variable("conv1_weights",
-                                                        initializer=tf.truncated_normal_initializer(
-                                                            # 5x5 filter, depth 32.
-                                                            stddev=0.1,
-                                                            seed=66478), shape=[5, 5, 1, 32], dtype=tf.float32)
-                        conv1_biases = tf.get_variable("conv1_biases", initializer=tf.zeros_initializer([32]),
-                                                       dtype=tf.float32)
-                        conv2_weights = tf.get_variable("conv2_weights", initializer=tf.truncated_normal_initializer(
-                            stddev=0.1,
-                            seed=66478), shape=[5, 5, 32, 64], dtype=tf.float32)
-                        conv2_biases = tf.get_variable("conv2_biases", initializer=tf.constant_initializer(value=0.1),
-                                                       shape=[64], dtype=tf.float32)
-                        fc1_weights = tf.get_variable("fc1_weights", initializer=  # fully connected, depth 512.
-                        tf.truncated_normal_initializer(
-                            stddev=0.1,
-                            seed=66478),
-                                                      shape=[28 // 4 * 28 // 4 * 64, 512],
-                                                      dtype=tf.float32)
-                        fc1_biases = tf.get_variable("fc1_biases", initializer=tf.constant_initializer(value=0.1),
-                                                     shape=[512], dtype=tf.float32)
-                        fc2_weights = tf.get_variable("fc2_weights", initializer=tf.truncated_normal_initializer(
-                            stddev=0.1,
-                            seed=66478),
-                                                      shape=[512, 10],
-                                                      dtype=tf.float32)
-                        fc2_biases = tf.get_variable("fc2_biases", initializer=tf.constant_initializer(value=
-                                                                                                       0.1), shape=[10],
-                                                     dtype=tf.float32)
-
-
-                        """The Model definition."""
-                        # 2D convolution, with 'SAME' padding (i.e. the output feature map has
-                        # the same size as the input). Note that {strides} is a 4D array whose
-                        # shape matches the data layout: [image index, y, x, depth].
-                        conv = tf.nn.conv2d(data,
-                                            conv1_weights,
-                                            strides=[1, 1, 1, 1],
-                                            padding='SAME')
-                        # Bias and rectified linear non-linearity.
-                        relu = tf.nn.relu(tf.nn.bias_add(conv, conv1_biases))
-                        # Max pooling. The kernel size spec {ksize} also follows the layout of
-                        # the data. Here we have a pooling window of 2, and a stride of 2.
-                        pool = tf.nn.max_pool(relu,
-                                              ksize=[1, 2, 2, 1],
-                                              strides=[1, 2, 2, 1],
-                                              padding='SAME')
-                        conv = tf.nn.conv2d(pool,
-                                            conv2_weights,
-                                            strides=[1, 1, 1, 1],
-                                            padding='SAME')
-                        relu = tf.nn.relu(tf.nn.bias_add(conv, conv2_biases))
-                        pool = tf.nn.max_pool(relu,
-                                              ksize=[1, 2, 2, 1],
-                                              strides=[1, 2, 2, 1],
-                                              padding='SAME')
-                        # Reshape the feature map cuboid into a 2D matrix to feed it to the
-                        # fully connected layers.
-                        pool_shape = pool.get_shape().as_list()
-                        reshape = tf.reshape(
-                            pool,
-                            [pool_shape[0], pool_shape[1] * pool_shape[2] * pool_shape[3]])
-                        # Fully connected layer. Note that the '+' operation automatically
-                        # broadcasts the biases.
-                        hidden = tf.nn.relu(tf.matmul(reshape, fc1_weights) + fc1_biases)
-                        # Add a 50% dropout during training only. Dropout also scales
-                        # activations such that no rescaling is needed at evaluation time.
-                        if train:
-                            hidden = tf.nn.dropout(hidden, 0.5, seed=66478)
-                        return tf.matmul(hidden, fc2_weights) + fc2_biases, conv1_biases
-
-
-                scope = "letNet"
-                # logits, endpoints = model.create_model(images, config, is_training=True, scope=scope)
-                logits, conv1_bias = create_model(images, True, scope=scope)
+                scope = "myNet"
+                logits, endpoints = model.create_model(images, config, is_training=True, scope=scope)
                 loss_op = model.loss(logits, labels)
                 prediction_op = tf.cast(tf.argmax(tf.nn.softmax(logits), 1), tf.int32)
                 tf.scalar_summary("loss", loss_op)
 
                 # Add summaries for viewing model statistics on TensorBoard.
                 # Make sure they are named uniquely
-                # summaries = {}
-                # for act in endpoints.values():
-                #     summaries[act.op.name] = act
-                #
-                # slim.summarize_tensors(summaries.values())
+                summaries = {}
+                for act in endpoints.values():
+                    summaries[act.op.name] = act
+
+                slim.summarize_tensors(summaries.values())
 
 
                 val_images = tf.reshape(mnist.test.images, [-1, 28, 28])
@@ -180,9 +106,8 @@ def train():
 
                 )
 
-                scope = tf.VariableScope(reuse=True, name="letNet")
-                # validation_logits, _ = model.create_model(validation_images, config, is_training=False, scope=scope)
-                validation_logits, validation_conv1_bias = create_model(validation_images, False, scope=scope)
+                scope = tf.VariableScope(reuse=True, name="myNet")
+                validation_logits, _ = model.create_model(validation_images, config, is_training=False, scope=scope)
                 validation_loss_op = model.loss(validation_logits, validation_labels)
                 validation_prediction_op = tf.cast(tf.argmax(tf.nn.softmax(validation_logits), 1), tf.int32)
                 tf.scalar_summary("validation_loss", validation_loss_op)
@@ -236,10 +161,6 @@ def train():
 
                     # Run a validation set of 100*batch_size samples periodically
                     if step % 100 == 0 and step > 0:
-
-                        a, b = sess.run([conv1_bias, validation_conv1_bias])
-                        print("bias a", a)
-                        print("bias b", b)
 
                         eval_results = map(lambda x: sess.run([validation_loss_op, validation_prediction_op, validation_labels]), range(0, 100))
                         validation_loss, predicted_labels, true_labels = map(list, zip(*eval_results))
