@@ -54,21 +54,29 @@ def train():
                 model = topcoder_crnn
 
                 with tf.variable_scope("training") as vs:
-                    logits, endpoints = model.create_model(images, config, is_training=True)
+                    from tensorflow.contrib.slim.python.slim.nets import alexnet
+                    logits, endpoints = alexnet.alexnet_v2(images, config["num_classes"], spatial_squeeze=False)
+                    logits = slim.layers.fully_connected(slim.layers.flatten(logits), 4, activation_fn=None, scope='fc8')
+
+                    # logits, endpoints = model.create_model(images, config, is_training=True)
                     loss_op = model.loss(logits, labels)
                     prediction_op = tf.cast(tf.argmax(tf.nn.softmax(logits), 1), tf.int32)
                     tf.scalar_summary("loss", loss_op)
 
                     # Add summaries for viewing model statistics on TensorBoard.
                     # Make sure they are named uniquely
-                    summaries = {}
-                    for act in endpoints.values():
-                        summaries[act.op.name] = act
+                    # summaries = {}
+                    # for act in endpoints.values():
+                    #     summaries[act.op.name] = act
 
-                    slim.summarize_tensors(summaries.values())
+                    # slim.summarize_tensors(summaries.values())
 
                 with tf.variable_scope(vs, reuse=True):
-                    validation_logits, _ = model.create_model(validation_images, config, is_training=False)
+                    # validation_logits, _ = model.create_model(validation_images, config, is_training=False)
+                    validation_logits, endpoints  = alexnet.alexnet_v2(validation_images, config["num_classes"], is_training=False, spatial_squeeze=False)
+
+                    validation_logits = slim.layers.fully_connected(slim.layers.flatten(validation_logits), 4, activation_fn=None, scope='fc8')
+
                     validation_loss_op = model.loss(validation_logits, validation_labels)
                     validation_prediction_op = tf.cast(tf.argmax(tf.nn.softmax(validation_logits), 1), tf.int32)
                     tf.scalar_summary("validation_loss", validation_loss_op)
