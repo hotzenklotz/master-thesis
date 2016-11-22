@@ -75,29 +75,36 @@ def train():
 
                 def create_model(data, train=False, scope="testmodel"):
 
-                    with tf.variable_scope(scope, "CNN") as sc:
+                    with tf.variable_scope(scope) as sc:
+                        conv1_weights = tf.get_variable("conv1_weights",
+                                                        initializer=tf.truncated_normal_initializer(
+                                                            # 5x5 filter, depth 32.
+                                                            stddev=0.1,
+                                                            seed=66478), shape=[5, 5, 1, 32], dtype=tf.float32)
+                        conv1_biases = tf.get_variable("conv1_biases", initializer=tf.zeros_initializer([32]),
+                                                       dtype=tf.float32)
+                        conv2_weights = tf.get_variable("conv2_weights", initializer=tf.truncated_normal_initializer(
+                            stddev=0.1,
+                            seed=66478), shape=[5, 5, 32, 64], dtype=tf.float32)
+                        conv2_biases = tf.get_variable("conv2_biases", initializer=tf.constant_initializer(value=0.1),
+                                                       shape=[64], dtype=tf.float32)
+                        fc1_weights = tf.get_variable("fc1_weights", initializer=  # fully connected, depth 512.
+                        tf.truncated_normal_initializer(
+                            stddev=0.1,
+                            seed=66478),
+                                                      shape=[28 // 4 * 28 // 4 * 64, 512],
+                                                      dtype=tf.float32)
+                        fc1_biases = tf.get_variable("fc1_biases", initializer=tf.constant_initializer(value=0.1),
+                                                     shape=[512], dtype=tf.float32)
+                        fc2_weights = tf.get_variable("fc2_weights", initializer=tf.truncated_normal_initializer(
+                            stddev=0.1,
+                            seed=66478),
+                                                      shape=[512, 10],
+                                                      dtype=tf.float32)
+                        fc2_biases = tf.get_variable("fc2_biases", initializer=tf.constant_initializer(value=
+                                                                                                       0.1), shape=[10],
+                                                     dtype=tf.float32)
 
-                        conv1_weights = tf.Variable(
-                            tf.truncated_normal([5, 5, 1, 32],  # 5x5 filter, depth 32.
-                                                stddev=0.1,
-                                                seed=66478, dtype=tf.float32))
-                        conv1_biases = tf.Variable(tf.zeros([32], dtype=tf.float32))
-                        conv2_weights = tf.Variable(tf.truncated_normal(
-                            [5, 5, 32, 64], stddev=0.1,
-                            seed=66478, dtype=tf.float32))
-                        conv2_biases = tf.Variable(tf.constant(0.1, shape=[64], dtype=tf.float32))
-                        fc1_weights = tf.Variable(  # fully connected, depth 512.
-                            tf.truncated_normal([28 // 4 * 28 // 4 * 64, 512],
-                                                stddev=0.1,
-                                                seed=66478,
-                                                dtype=tf.float32))
-                        fc1_biases = tf.Variable(tf.constant(0.1, shape=[512], dtype=tf.float32))
-                        fc2_weights = tf.Variable(tf.truncated_normal([512, 10],
-                                                                      stddev=0.1,
-                                                                      seed=66478,
-                                                                      dtype=tf.float32))
-                        fc2_biases = tf.Variable(tf.constant(
-                            0.1, shape=[10], dtype=tf.float32))
 
                         """The Model definition."""
                         # 2D convolution, with 'SAME' padding (i.e. the output feature map has
@@ -140,7 +147,7 @@ def train():
                         return tf.matmul(hidden, fc2_weights) + fc2_biases, conv1_biases
 
 
-                scope = "CNN_model"
+                scope = "letNet"
                 # logits, endpoints = model.create_model(images, config, is_training=True, scope=scope)
                 logits, conv1_bias = create_model(images, True, scope=scope)
                 loss_op = model.loss(logits, labels)
@@ -173,7 +180,7 @@ def train():
 
                 )
 
-                scope = tf.VariableScope(reuse=True, name="CNN_model")
+                scope = tf.VariableScope(reuse=True, name="letNet")
                 # validation_logits, _ = model.create_model(validation_images, config, is_training=False, scope=scope)
                 validation_logits, validation_conv1_bias = create_model(validation_images, False, scope=scope)
                 validation_loss_op = model.loss(validation_logits, validation_labels)
